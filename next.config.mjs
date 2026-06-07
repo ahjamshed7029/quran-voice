@@ -1,10 +1,16 @@
-/** @type {import('next').NextConfig} */
+import withPWAInit from 'next-pwa';
+
+const withPWA = withPWAInit({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+});
+
 const nextConfig = {
-  output: 'export',       // Включает статический экспорт в папку out
-  trailingSlash: true,    // Обязательно для правильных путей в Capacitor
-  images: {
-    unoptimized: true,    // Отключает серверную оптимизацию картинок
-  },
+  output: 'export',
+  trailingSlash: true,
+
+  basePath: '/quran-voice',
+  assetPrefix: '/quran-voice/',
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);
