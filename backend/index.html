@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Quran AI</title>
+</head>
+
+<body>
+
+    <h1>Quran Voice AI</h1>
+
+    <button id="recordBtn">
+        🎤 Record
+    </button>
+
+    <script>
+
+        let mediaRecorder
+        let audioChunks = []
+
+        const button =
+            document.getElementById("recordBtn")
+
+        button.onclick = async () => {
+
+            // START RECORD
+
+            if (!mediaRecorder) {
+
+                const stream =
+                    await navigator.mediaDevices.getUserMedia({
+                        audio: true
+                    })
+
+                mediaRecorder =
+                    new MediaRecorder(stream)
+
+                mediaRecorder.ondataavailable =
+                    event => {
+                        audioChunks.push(event.data)
+                    }
+
+                mediaRecorder.onstop =
+                    async () => {
+
+                        const audioBlob =
+                            new Blob(audioChunks, {
+                                type: "audio/mp3"
+                            })
+
+                        audioChunks = []
+
+                        const formData =
+                            new FormData()
+
+                        formData.append(
+                            "audio",
+                            audioBlob,
+                            "voice.mp3"
+                        )
+
+                        formData.append(
+                            "student_type",
+                            "man"
+                        )
+
+                        formData.append(
+                            "stage",
+                            "greeting"
+                        )
+
+                        formData.append(
+                            "current_ayah",
+                            "1"
+                        )
+
+                        // SEND TO FASTAPI
+
+                        const response =
+                            await fetch(
+                                "https://127.0.0.1:3000/api/agent/talk",
+                                {
+                                    method: "POST",
+                                    body: formData
+                                }
+                            )
+
+                        const data =
+                            await response.json()
+
+                        console.log(data)
+
+                        // PLAY AI VOICE
+
+                        if (
+                            data.audio_response_base64
+                        ) {
+
+                            const audio =
+                                new Audio(
+                                    `data:audio/mp3;base64,${data.audio_response_base64}`
+                                )
+
+                            audio.play()
+                        }
+                    }
+
+                mediaRecorder.start()
+
+                button.innerText =
+                    "⏹ Stop"
+
+            }
+
+            // STOP RECORD
+
+            else {
+
+                mediaRecorder.stop()
+
+                mediaRecorder = null
+
+                button.innerText =
+                    "🎤 Record"
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
