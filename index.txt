@@ -1,5 +1,5 @@
 1:HL["/quran-voice/_next/static/css/a240711a1bcb6509.css","style",{"crossOrigin":""}]
-0:["hjekpxu31wzO_Qnk0l0uG",[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"/quran-voice/_next/static/css/a240711a1bcb6509.css","precedence":"next","crossOrigin":""}]],"$L3"]]]]
+0:["0EjxpRYttl-APNz_Kz5Bk",[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"/quran-voice/_next/static/css/a240711a1bcb6509.css","precedence":"next","crossOrigin":""}]],"$L3"]]]]
 4:I[6954,[],""]
 5:I[7264,[],""]
 7:I[8297,[],""]
