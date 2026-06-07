@@ -1,24 +1,21 @@
 {
-  "name": "Quran Voice Coach",
+  "name": "Quran Voice",
   "short_name": "Quran Voice",
-  "description": "A voice-first Quran learning app optimized for blind, disabled, and beginner learners.",
+  "description": "Прослушивание Священного Корана на более чем 100 языках",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
   "icons": [
     {
-      "src": "/icons/maskable_icon_x192.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable any"
+      "type": "image/png"
     },
     {
-      "src": "/icons/maskable_icon_x512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable any"
+      "type": "image/png"
     }
-  ],
-  "theme_color": "#071021",
-  "background_color": "#071021",
-  "display": "standalone",
-  "scope": "/",
-  "start_url": "/?source=pwa"
+  ]
 }

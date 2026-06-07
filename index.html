@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muallim AI</title>
+    <link rel="manifest" href="./public/manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f3f4f6;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            background-color: #10b981;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.2s;
+        }
+
+        button.recording {
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Muallim Voice AI</h1>
+
+    <button id="recordBtn">🎤 Record</button>
+
+    <script>
+        // Перенесли регистрацию Service Worker внутрь тега <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log('Service Worker зарегистрирован!'))
+                .catch(err => console.log('Ошибка SW:', err));
+        }
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let stream = null;
+
+        const button = document.getElementById("recordBtn");
+
+        // Функция для ленивой инициализации микрофона
+        async function initMicrophone() {
+            if (!stream) {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+
+            // Определяем поддерживаемый тип контейнера (Safari не любит webm, Chrome любит)
+            const options = MediaRecorder.isTypeSupported('audio/webm')
+                ? { mimeType: 'audio/webm' }
+                : { mimeType: 'audio/mp4' };
+
+            mediaRecorder = new MediaRecorder(stream, options);
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                // Создаем blob с реальным mime-типом, который записал браузер
+                const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                audioChunks = [];
+
+                const formData = new FormData();
+                // Передаем файл. Изменяем расширение в зависимости от типа
+                const fileExtension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
+                formData.append("audio", audioBlob, `voice.${fileExtension}`);
+
+                formData.append("student_type", "man");
+                formData.append("stage", "greeting");
+                formData.append("current_ayah", "1");
+
+                try {
+                    button.innerText = "⏳ Processing...";
+                    button.disabled = true;
+
+                    // ВНИМАНИЕ: Для теста на телефоне замените 127.0.0.1 на ваш IP в локальной сети
+                    const response = await fetch("https://127.0.0.1:3000/api/agent/talk", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.audio_response_base64) {
+                        const audio = new Audio(`data:audio/mp3;base64,${data.audio_response_base64}`);
+                        await audio.play();
+                    }
+                } catch (error) {
+                    console.error("Ошибка при отправке или воспроизведении:", error);
+                    alert("Ошибка соединения с сервером");
+                } finally {
+                    button.disabled = false;
+                    button.innerText = "🎤 Record";
+                    button.classList.remove("recording");
+                }
+            };
+        }
+
+        button.onclick = async () => {
+            try {
+                if (!mediaRecorder || mediaRecorder.state === "inactive") {
+                    await initMicrophone();
+                    audioChunks = []; // Очищаем буфер перед стартом
+                    mediaRecorder.start();
+                    button.innerText = "⏹ Stop";
+                    button.classList.add("recording");
+                } else {
+                    mediaRecorder.stop();
+                }
+            } catch (err) {
+                console.error("Доступ к микрофону отклонен или не поддерживается:", err);
+                alert("Не удалось включить микрофон. Проверьте разрешения HTTPS.");
+            }
+        };
+    </script>
+
+</body>
+
+</html>
