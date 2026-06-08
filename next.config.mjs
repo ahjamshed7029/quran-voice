@@ -10,7 +10,6 @@ const nextConfig = {
   trailingSlash: true,
 
   basePath: '/quran-voice',
-  assetPrefix: '/quran-voice/',
 };
 
 export default withPWA(nextConfig);

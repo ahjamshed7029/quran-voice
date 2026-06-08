@@ -7,11 +7,11 @@
   "homepage": "https://ahjamshed7029.github.io/quran-voice",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && npx touch out/.nojekyll",
+    "build": "node scripts/clean-out.cjs && next build && npx touch out/.nojekyll",
     "export": "next export",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "gh-pages -d out"
+    "deploy": "npm run build && gh-pages -t -d out"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Quran Voice Coach',
   description: 'A calm voice-first Quran learning PWA designed for blind, disabled, and beginner learners.',
   icons: {
-    icon: '/quran-voice/icons/maskable_icon_x192.png'
+    icon: '/quran-voice/icons/icon-192.png'
   },
   manifest: '/quran-voice/manifest.json'
 };
