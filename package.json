@@ -6,7 +6,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "gh-pages -d out"
+    "deploy": "gh-pages -f -d out"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
