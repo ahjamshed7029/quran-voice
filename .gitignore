@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 node_modules
 .next
 out
@@ -18,4 +19,18 @@ public/workbox-*.js.map
 public/worker-*.js
 public/worker-*.js.map
 public/fallback-*.js
-public/fallback-*.js.map
+public/fallback-*.js.map
+=======
+node_modules
+.next
+out
+.DS_Store
+.env*
+coverage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+certificates
+.aider*
+>>>>>>> gh-pages
