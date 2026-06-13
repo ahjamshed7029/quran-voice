@@ -1,26 +1,20 @@
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import './globals.css';
 
-// 1. Метаданные (наше новое название Siraj)
-export const metadata: Metadata = {
+export const metadata = {
   title: 'Siraj — Quran Voice Coach',
-  description: 'Путеводный светильник в ночи',
+  description: 'Guiding Light',
   icons: {
-    icon: '/favicon.ico',
     apple: '/icons/icon-192.png',
   },
-  manifest: '/manifest.json'
+  manifest: '/manifest.json',
 };
 
-// 2. Главный компонент разметки
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
+    <html lang="en" className="bg-midnight text-soft">
       <body>
-        <div className="min-h-screen bg-midnight text-soft">
-          {children}
-        </div>
+        <div className="min-h-screen bg-midnight text-soft">{children}</div>
       </body>
     </html>
   );
