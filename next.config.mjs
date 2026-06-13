@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    output: 'export', // Обязательно для GitHub Pages
+    output: 'export',
     basePath: '/quran-voice',
-    assetPrefix: '/quran-voice',
     images: {
-        unoptimized: true, // GitHub Pages не поддерживает оптимизацию картинок Next.js
+        unoptimized: true, // Это спасет от возможных ошибок с картинками на GitHub Pages
     },
 };
 
