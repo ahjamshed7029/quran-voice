@@ -14,7 +14,7 @@ export default function Home() {
       {/* Ваш новый логотип Siraj */}
       <div style={{ position: 'relative', width: '320px', height: '450px' }}>
         <Image
-          src="/quran-voice/logo.png"
+          src="/logo.png"
           alt="Siraj — Quran Voice Coach"
           fill
           style={{ objectFit: 'contain' }}
