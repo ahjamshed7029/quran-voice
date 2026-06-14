@@ -12,6 +12,7 @@
     "@capacitor/core": "^8.4.0",
     "@tailwindcss/postcss": "^4.3.1",
     "autoprefixer": "^10.5.0",
+    "capacitor-voice-recorder": "^7.0.6",
     "next": "^14.2.35",
     "next-pwa": "^5.6.0",
     "postcss": "^8.5.15",
