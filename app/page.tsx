@@ -56,11 +56,11 @@ export default function Home() {
     silenceTimerRef.current = setTimeout(async () => {
       setDebugMessage('Тайм-аут: ничего не слышно');
       await stopRecordingFlow();
-      aiSpeak('Я не слышу тебя. Скажи что-нибудь, я внимательно слушаю.');
-    }, 15000); 
+      aiSpeak('Я не слышу тебя. Скажи что-нибудь.');
+    }, 15000);
   };
 
-  const aiSpeak = (text: string, audioBase64: string | null = null, callback: (() => void) | null = null) => {
+  const aiSpeak = (text: string, audioBase64: string | null = null, preferredColor: string = 'green', callback: (() => void) | null = null) => {
     setDebugMessage(`Ответ: ${text}`);
 
     if (audioBase64) {
@@ -73,7 +73,7 @@ export default function Home() {
       audioResponseRef.current = audio;
 
       audio.onplay = () => {
-        setScreenColor('green');
+        setScreenColor(preferredColor);
       };
 
       audio.onended = () => {
@@ -85,15 +85,15 @@ export default function Home() {
 
       audio.play().catch(err => {
         console.error("Audio play failed, falling back to Web Speech:", err);
-        fallbackSpeak(text, callback);
+        fallbackSpeak(text, preferredColor, callback);
       });
       return;
     }
 
-    fallbackSpeak(text, callback);
+    fallbackSpeak(text, preferredColor, callback);
   };
 
-  const fallbackSpeak = (text: string, callback: (() => void) | null = null) => {
+  const fallbackSpeak = (text: string, preferredColor: string = 'green', callback: (() => void) | null = null) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       console.error("Web Speech API not supported");
       setScreenColor('blue');
@@ -105,7 +105,7 @@ export default function Home() {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ru-RU';
     
-    utterance.onstart = () => setScreenColor('green');
+    utterance.onstart = () => setScreenColor(preferredColor);
     utterance.onend = () => {
       setScreenColor('blue');
       startRecordingFlow();
@@ -152,7 +152,6 @@ export default function Home() {
             console.log('No audio data captured');
             return;
           }
-          // @ts-ignore
           const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType });
           await sendAudioToBackend(audioBlob);
         };
@@ -251,7 +250,8 @@ export default function Home() {
 
       aiSpeak(
         data.text_response || 'Я получил сообщение, но ответ пуст.',
-        data.audio_response_base64
+        data.audio_response_base64,
+        data.screen_color || 'green'
       );
 
     } catch (error: any) {
@@ -291,6 +291,23 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  window.location.reload();
+                }
+              }
+            };
+          }
+        };
+      });
+    }
+
     return () => {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (audioResponseRef.current) {
@@ -303,13 +320,13 @@ export default function Home() {
     <div className="bg-midnight text-soft min-h-screen flex flex-col items-center justify-center p-6 select-none overflow-hidden relative font-sans">
       
       {/* Settings & Debug Info */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-        <div className="text-[10px] font-mono text-zinc-500 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5">
+      <div className="absolute top-6 right-6 flex items-center gap-2 z-20">
+        <div className="text-[10px] font-mono text-zinc-500 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5 max-w-[150px] truncate">
           {debugMessage}
         </div>
         <button 
           onClick={() => setIsSettingsOpen(true)}
-          className="w-6 h-6 flex items-center justify-center rounded-full bg-black/40 border border-white/5 text-xs hover:text-white transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 border border-white/5 text-lg hover:text-white transition-colors active:scale-95"
         >
           ⚙️
         </button>
@@ -349,8 +366,8 @@ export default function Home() {
 
       {/* Main Content (Splash/Logo) */}
       {!isActivated && (
-        <div className="flex flex-col items-center animate-in fade-in zoom-in duration-1000">
-          <div className="relative w-[320px] h-[450px] mb-4">
+        <div className="flex flex-col items-center animate-in fade-in zoom-in duration-1000 max-w-full">
+          <div className="relative w-[280px] h-[280px] md:w-[320px] md:h-[320px] mb-8">
             <Image
               src="/icons/logo.png"
               alt="Siraj Logo"
@@ -364,7 +381,7 @@ export default function Home() {
           
           <button
             onClick={handleFirstTapStart}
-            className="group relative px-12 py-6 bg-transparent border border-[#e5c158]/30 rounded-full text-[#e5c158] text-xl font-medium tracking-widest overflow-hidden transition-all hover:border-[#e5c158] active:scale-95 shadow-[0_0_50px_rgba(229,193,88,0.1)]"
+            className="group relative px-12 py-5 bg-transparent border border-[#e5c158]/40 rounded-full text-[#e5c158] text-xl font-medium tracking-widest overflow-hidden transition-all hover:border-[#e5c158] active:scale-95 shadow-[0_0_50px_rgba(229,193,88,0.1)] z-10"
           >
             <div className="absolute inset-0 bg-[#e5c158]/5 group-hover:bg-[#e5c158]/10 transition-colors" />
             НАЧАТЬ ОБУЧЕНИЕ
@@ -375,51 +392,66 @@ export default function Home() {
       {/* Active State UI */}
       {isActivated && (
         <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-700">
-          <div
-            onClick={stopRecordingFlow}
-            className={`w-72 h-72 rounded-full border-4 transition-all duration-700 cursor-pointer flex items-center justify-center relative ${
-              screenColor === 'green'
-                ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_120px_rgba(52,211,153,0.4)]'
-                : screenColor === 'yellow'
-                  ? 'bg-amber-500/20 border-amber-300 shadow-[0_0_100px_rgba(251,191,36,0.4)]'
-                  : screenColor === 'blue'
-                    ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_120px_rgba(96,165,250,0.4)]'
-                    : 'bg-rose-500/20 border-rose-400 shadow-[0_0_100px_rgba(244,63,94,0.3)]'
-            }`}
-          >
-            {screenColor === 'blue' && (
-              <div className="absolute inset-0 rounded-full border-4 border-blue-400/30 animate-ping" />
-            )}
-            
-            {screenColor === 'red' && (
-              <span className="text-white/40 text-xs tracking-widest uppercase animate-pulse">Инициализация</span>
-            )}
-            
-            {screenColor === 'blue' && (
-              <div className="flex flex-col items-center">
-                <div className="flex gap-1 mb-3">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="w-1.5 h-8 bg-blue-400 rounded-full animate-wave" style={{ animationDelay: `${i * 0.15}s` }} />
-                  ))}
-                </div>
-                <span className="text-blue-400 text-xs font-bold tracking-widest uppercase">Слушаю вас</span>
-              </div>
-            )}
-            
-            {screenColor === 'green' && (
-               <div className="flex items-center gap-2">
-                 <div className="w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
-                 <span className="text-emerald-400 text-xs font-bold tracking-widest uppercase">Говорю ответ</span>
-               </div>
-            )}
-            
-            {screenColor === 'yellow' && (
-               <span className="text-amber-300 text-xs font-bold tracking-widest uppercase">Ошибка сети</span>
-            )}
-          </div>
           
-          <p className="mt-16 text-zinc-500 font-light tracking-widest text-sm uppercase text-center">
-            {screenColor === 'blue' ? 'Говорите сейчас' : screenColor === 'green' ? 'Слушайте учителя' : 'Нажмите на круг'}
+          {debugMessage === 'Обработка голоса...' ? (
+            <div className="flex gap-6 h-72 items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-500 shadow-[0_0_30px_rgba(52,211,153,0.6)] animate-pulse" />
+              <div className="w-12 h-12 rounded-full bg-amber-500 shadow-[0_0_30px_rgba(251,191,36,0.6)] animate-pulse [animation-delay:0.2s]" />
+              <div className="w-12 h-12 rounded-full bg-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.6)] animate-pulse [animation-delay:0.4s]" />
+            </div>
+          ) : (
+            <div
+              onClick={stopRecordingFlow}
+              className={`w-72 h-72 rounded-full border-4 transition-all duration-700 cursor-pointer flex items-center justify-center relative ${
+                screenColor === 'green'
+                  ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_120px_rgba(52,211,153,0.4)]'
+                  : screenColor === 'yellow'
+                    ? 'bg-amber-500/20 border-amber-300 shadow-[0_0_100px_rgba(251,191,36,0.4)]'
+                    : screenColor === 'blue'
+                      ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_120px_rgba(96,165,250,0.4)]'
+                      : 'bg-rose-500/20 border-rose-400 shadow-[0_0_100px_rgba(244,63,94,0.3)]'
+              }`}
+            >
+              {screenColor === 'blue' && (
+                <div className="absolute inset-0 rounded-full border-4 border-blue-400/30 animate-ping" />
+              )}
+              
+              {screenColor === 'red' && (
+                <span className="text-white/40 text-xs tracking-widest uppercase animate-pulse">Инициализация</span>
+              )}
+              
+              {screenColor === 'blue' && (
+                <div className="flex flex-col items-center">
+                  <div className="flex gap-1 mb-3">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="w-1.5 h-8 bg-blue-400 rounded-full animate-wave" style={{ animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </div>
+                  <span className="text-blue-400 text-xs font-bold tracking-widest uppercase">Слушаю вас</span>
+                </div>
+              )}
+              
+              {screenColor === 'green' && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
+                  <span className="text-emerald-400 text-xs font-bold tracking-widest uppercase">Говорю ответ</span>
+                </div>
+              )}
+              
+              {screenColor === 'yellow' && (
+                <span className="text-amber-300 text-xs font-bold tracking-widest uppercase">Ошибка сети</span>
+              )}
+            </div>
+          )}
+          
+          <p className="mt-16 text-zinc-500 font-light tracking-widest text-sm uppercase text-center min-h-[1.5em]">
+            {debugMessage === 'Обработка голоса...' 
+              ? 'Думаю...' 
+              : screenColor === 'blue' 
+                ? 'Говорите сейчас' 
+                : screenColor === 'green' 
+                  ? 'Слушайте учителя' 
+                  : 'Нажмите на круг'}
           </p>
         </div>
       )}

@@ -34,3 +34,4 @@ yarn-error.log*
 certificates
 .aider*
 >>>>>>> gh-pages
+.vercel
