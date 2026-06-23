@@ -131,7 +131,7 @@ export default function Home() {
         const isSelected = await VoiceRecorder.canDeviceVoiceRecord();
         if (isSelected.value) {
           const status = await VoiceRecorder.getCurrentStatus();
-          if (status.status === 'NONE' || status.status === 'STOPPED') {
+          if (status.status === 'NONE') {
             await VoiceRecorder.startRecording();
           }
         }
@@ -403,12 +403,12 @@ export default function Home() {
             <div
               onClick={stopRecordingFlow}
               className={`w-72 h-72 rounded-full border-4 transition-all duration-700 cursor-pointer flex items-center justify-center relative ${screenColor === 'green'
-                  ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_120px_rgba(52,211,153,0.4)]'
-                  : screenColor === 'yellow'
-                    ? 'bg-amber-500/20 border-amber-300 shadow-[0_0_100px_rgba(251,191,36,0.4)]'
-                    : screenColor === 'blue'
-                      ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_120px_rgba(96,165,250,0.4)]'
-                      : 'bg-rose-500/20 border-rose-400 shadow-[0_0_100px_rgba(244,63,94,0.3)]'
+                ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_120px_rgba(52,211,153,0.4)]'
+                : screenColor === 'yellow'
+                  ? 'bg-amber-500/20 border-amber-300 shadow-[0_0_100px_rgba(251,191,36,0.4)]'
+                  : screenColor === 'blue'
+                    ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_120px_rgba(96,165,250,0.4)]'
+                    : 'bg-rose-500/20 border-rose-400 shadow-[0_0_100px_rgba(244,63,94,0.3)]'
                 }`}
             >
               {screenColor === 'blue' && (
