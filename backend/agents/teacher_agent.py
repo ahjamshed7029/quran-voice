@@ -43,7 +43,7 @@ def teacher_response(student_text: str, student_type: str = "man", stage: str = 
 
     try:
         response = client.chat.completions.create(
-            model="google/gemini-2.5-flash",  # <--- ИСПРАВЛЕНО ЗДЕСЬ
+            model="google/gemini-flash-1.5",  # Исправлено на валидную модель OpenRouter
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": student_text}

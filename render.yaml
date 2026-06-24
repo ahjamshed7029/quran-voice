@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: quran-voice-backend
+    env: python
+    # This tells Render to look in the backend directory for source code
+    # and run the build/start commands from there.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT

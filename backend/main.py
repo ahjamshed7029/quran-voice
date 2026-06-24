@@ -138,5 +138,7 @@ def root():
     return {"status": "working", "ip": "192.168.76.70"}
 
 if __name__ == "__main__":
-    # Читаем порт из системы (Render передает его автоматически), иначе берем 3000
-    port
+    import os
+    # Читаем порт из системы (Render передает его автоматически), иначе берем 8000
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

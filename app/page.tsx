@@ -23,8 +23,6 @@ export default function Home() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const isWebRecorder = useRef(true);
-
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioResponseRef = useRef<HTMLAudioElement | null>(null);
 
@@ -32,31 +30,13 @@ export default function Home() {
   const mentorNameRef = useRef('Хасан');
   const currentAyahRef = useRef(1);
 
-  // Initialize permissions
-  useEffect(() => {
-    const initPermissions = async () => {
-      if (typeof window !== 'undefined' && (window as any).Capacitor && (window as any).Capacitor.isNativePlatform()) {
-        try {
-          const { VoiceRecorder } = await import('capacitor-voice-recorder');
-          const result = await VoiceRecorder.requestAudioRecordingPermission();
-          console.log('VoiceRecorder permission:', result.value);
-          isWebRecorder.current = false;
-        } catch (e) {
-          console.error('VoiceRecorder init error:', e);
-          isWebRecorder.current = true;
-        }
-      }
-    };
-    initPermissions();
-  }, []);
-
   const resetSilenceTimer = () => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
     silenceTimerRef.current = setTimeout(async () => {
       setDebugMessage('Тайм-аут: ничего не слышно');
       await stopRecordingFlow();
-      aiSpeak('Я не слышу тебя. Скажи что-нибудь.');
+      aiSpeak('Я не слышу тебя. Скажи что-нибудь.', null, 'yellow');
     }, 15000);
   };
 
@@ -77,7 +57,6 @@ export default function Home() {
       };
 
       audio.onended = () => {
-        setScreenColor('blue');
         startRecordingFlow();
         resetSilenceTimer();
         if (callback) callback();
@@ -96,7 +75,6 @@ export default function Home() {
   const fallbackSpeak = (text: string, preferredColor: string = 'green', callback: (() => void) | null = null) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       console.error("Web Speech API not supported");
-      setScreenColor('blue');
       startRecordingFlow();
       return;
     }
@@ -107,14 +85,12 @@ export default function Home() {
 
     utterance.onstart = () => setScreenColor(preferredColor);
     utterance.onend = () => {
-      setScreenColor('blue');
       startRecordingFlow();
       resetSilenceTimer();
       if (callback) callback();
     };
     utterance.onerror = (err) => {
       console.error("SpeechSynthesis error:", err);
-      setScreenColor('blue');
       startRecordingFlow();
     };
 
@@ -123,22 +99,9 @@ export default function Home() {
 
   const startRecordingFlow = async () => {
     setDebugMessage('Слушаю вас...');
-    setScreenColor('blue');
+    setScreenColor('green'); // User requested Green for listening/correct
 
     try {
-      if (!isWebRecorder.current) {
-        const { VoiceRecorder } = await import('capacitor-voice-recorder');
-        const isSelected = await VoiceRecorder.canDeviceVoiceRecord();
-        if (isSelected.value) {
-          const status = await VoiceRecorder.getCurrentStatus();
-          if (status.status === 'NONE') {
-            await VoiceRecorder.startRecording();
-          }
-        }
-        return;
-      }
-
-      audioChunksRef.current = [];
       if (!mediaRecorderRef.current) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorderRef.current = new MediaRecorder(stream);
@@ -157,6 +120,7 @@ export default function Home() {
         };
       }
 
+      audioChunksRef.current = [];
       if (mediaRecorderRef.current.state === 'inactive') {
         mediaRecorderRef.current.start();
       }
@@ -172,19 +136,6 @@ export default function Home() {
     setDebugMessage('Обработка голоса...');
 
     try {
-      if (!isWebRecorder.current) {
-        const { VoiceRecorder } = await import('capacitor-voice-recorder');
-        const status = await VoiceRecorder.getCurrentStatus();
-        if (status.status === 'RECORDING') {
-          const result = await VoiceRecorder.stopRecording();
-          if (result.value && result.value.recordDataBase64) {
-            const audioBlob = await (await fetch(`data:${result.value.mimeType};base64,${result.value.recordDataBase64}`)).blob();
-            await sendAudioToBackend(audioBlob);
-          }
-        }
-        return;
-      }
-
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
@@ -202,69 +153,43 @@ export default function Home() {
     else if (audioBlob.type.includes('wav')) extension = 'wav';
     else if (audioBlob.type.includes('ogg')) extension = 'ogg';
 
-    formData.append(
-      'audio',
-      audioBlob,
-      `student_voice.${extension}`
-    );
-
+    formData.append('audio', audioBlob, `student_voice.${extension}`);
     formData.append('stage', stageRef.current);
     formData.append('mentor_name', mentorNameRef.current);
-    formData.append(
-      'current_ayah',
-      String(currentAyahRef.current)
-    );
+    formData.append('current_ayah', String(currentAyahRef.current));
 
     try {
       setDebugMessage('Отправка на сервер...');
 
-      const response = await fetch(
-        `${apiUrl}/api/agent/talk`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      const response = await fetch(`${apiUrl}/api/agent/talk`, {
+        method: 'POST',
+        body: formData,
+      });
 
       if (!response.ok) {
-        throw new Error(
-          `HTTP ${response.status} ${response.statusText}`
-        );
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
 
-      console.log('Ответ сервера:', data);
-
       stageRef.current = data.stage || stageRef.current;
-      currentAyahRef.current =
-        data.current_ayah || currentAyahRef.current;
+      currentAyahRef.current = data.current_ayah || currentAyahRef.current;
+      if (data.mentor_name) mentorNameRef.current = data.mentor_name;
 
-      if (data.mentor_name) {
-        mentorNameRef.current = data.mentor_name;
-      }
-
-      setDebugMessage(
-        `Расслышано: "${data.student_heard || 'не распознано'}"`
-      );
+      setDebugMessage(`Расслышано: "${data.student_heard || 'не распознано'}"`);
 
       aiSpeak(
-        data.text_response || 'Я получил сообщение, но ответ пуст.',
+        data.text_response || 'Получено пустое сообщение.',
         data.audio_response_base64,
         data.screen_color || 'green'
       );
 
     } catch (error: any) {
       console.error(error);
-
       setScreenColor('yellow');
-
-      setDebugMessage(
-        `Ошибка сервера: ${error?.message || 'не удалось подключиться'}`
-      );
+      setDebugMessage(`Ошибка сервера: ${error?.message || 'не удалось подключиться'}`);
 
       setTimeout(() => {
-        setScreenColor('blue');
         startRecordingFlow();
         resetSilenceTimer();
       }, 3000);
@@ -272,7 +197,6 @@ export default function Home() {
   };
 
   const handleFirstTapStart = async () => {
-    console.log('Start button clicked');
     setDebugMessage('Запуск приветствия...');
     setIsActivated(true);
 
@@ -297,10 +221,8 @@ export default function Home() {
           const installingWorker = registration.installing;
           if (installingWorker) {
             installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed') {
-                if (navigator.serviceWorker.controller) {
-                  window.location.reload();
-                }
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.location.reload();
               }
             };
           }
@@ -310,38 +232,36 @@ export default function Home() {
 
     return () => {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      if (audioResponseRef.current) {
-        audioResponseRef.current.pause();
-      }
+      if (audioResponseRef.current) audioResponseRef.current.pause();
     };
   }, []);
 
   return (
-    <div className="bg-midnight text-soft min-h-screen flex flex-col items-center justify-center p-6 select-none overflow-hidden relative font-sans">
-
-      {/* Settings & Debug Info */}
-      <div className="absolute top-6 right-6 flex items-center gap-2 z-20">
-        <div className="text-[10px] font-mono text-zinc-500 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5 max-w-[150px] truncate">
+    <div className="bg-[#0b0f19] text-[#e5e7eb] min-h-screen flex flex-col items-center justify-center p-6 select-none overflow-hidden relative font-sans">
+      
+      {/* HUD: Debug & Settings */}
+      <div className="absolute top-6 right-6 flex items-center gap-3 z-20">
+        <div className="text-[10px] font-mono text-zinc-500 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 max-w-[200px] truncate">
           {debugMessage}
         </div>
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 border border-white/5 text-lg hover:text-white transition-colors active:scale-95"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 border border-white/5 text-lg hover:text-white transition-all active:scale-90"
         >
           ⚙️
         </button>
       </div>
 
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-6">
-          <div className="bg-graphite border border-white/10 p-8 rounded-3xl w-full max-w-sm shadow-2xl">
-            <h2 className="text-teal text-xl font-medium mb-6">Настройки сервера</h2>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-50 p-6">
+          <div className="bg-[#1a1f2e] border border-white/10 p-8 rounded-[2rem] w-full max-w-sm shadow-2xl">
+            <h2 className="text-[#e5c158] text-xl font-semibold mb-6">Настройки сервера</h2>
             <input
               type="text"
               defaultValue={apiUrl}
               id="api_input"
-              className="w-full bg-midnight border border-white/10 p-4 rounded-xl mb-6 text-soft font-mono text-sm focus:border-teal/50 outline-none transition-all"
-              placeholder="https://your-tunnel.loca.lt"
+              className="w-full bg-black/50 border border-white/10 p-4 rounded-xl mb-6 text-soft font-mono text-sm focus:border-[#e5c158]/50 outline-none transition-all"
+              placeholder="https://your-api.com"
             />
             <div className="flex gap-3">
               <button
@@ -349,13 +269,13 @@ export default function Home() {
                   const input = document.getElementById('api_input') as HTMLInputElement;
                   saveApiUrl(input.value);
                 }}
-                className="flex-1 bg-teal text-midnight font-bold p-4 rounded-xl active:scale-95 transition-transform"
+                className="flex-1 bg-[#e5c158] text-black font-bold p-4 rounded-xl active:scale-95 transition-all"
               >
                 Сохранить
               </button>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className="flex-1 bg-white/5 text-soft p-4 rounded-xl active:scale-95 transition-transform hover:bg-white/10"
+                className="flex-1 bg-white/5 text-soft p-4 rounded-xl active:scale-95 transition-all hover:bg-white/10"
               >
                 Отмена
               </button>
@@ -364,24 +284,24 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main Content (Splash/Logo) */}
+      {/* Hero: Splash Screen */}
       {!isActivated && (
-        <div className="flex flex-col items-center animate-in fade-in zoom-in duration-1000 max-w-full">
-          <div className="relative w-[280px] h-[280px] md:w-[320px] md:h-[320px] mb-8">
+        <div className="flex flex-col items-center animate-in fade-in zoom-in duration-1000">
+          <div className="relative w-64 h-64 md:w-80 md:h-80 mb-10">
             <Image
               src="/icons/logo.png"
               alt="Siraj Logo"
               fill
-              style={{ objectFit: 'contain' }}
+              className="object-contain"
               priority
             />
           </div>
-          <h1 className="text-4xl font-bold tracking-[0.2em] mb-2 text-[#e5c158]">SIRAJ</h1>
-          <p className="text-zinc-500 italic mb-12">سراج — Путеводный свет</p>
+          <h1 className="text-5xl font-black tracking-[0.3em] mb-3 text-[#e5c158]">SIRAJ</h1>
+          <p className="text-zinc-500 italic mb-16 text-lg tracking-widest">سراج — ПУТЕВОДНЫЙ СВЕТ</p>
 
           <button
             onClick={handleFirstTapStart}
-            className="group relative px-12 py-5 bg-transparent border border-[#e5c158]/40 rounded-full text-[#e5c158] text-xl font-medium tracking-widest overflow-hidden transition-all hover:border-[#e5c158] active:scale-95 shadow-[0_0_50px_rgba(229,193,88,0.1)] z-10"
+            className="group relative px-16 py-6 bg-transparent border border-[#e5c158]/30 rounded-full text-[#e5c158] text-xl font-bold tracking-[0.2em] overflow-hidden transition-all hover:border-[#e5c158] hover:shadow-[0_0_30px_rgba(229,193,88,0.2)] active:scale-95"
           >
             <div className="absolute inset-0 bg-[#e5c158]/5 group-hover:bg-[#e5c158]/10 transition-colors" />
             НАЧАТЬ ОБУЧЕНИЕ
@@ -389,82 +309,75 @@ export default function Home() {
         </div>
       )}
 
-      {/* Active State UI */}
+      {/* Main: Interactive Pulse */}
       {isActivated && (
-        <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-700">
-
-          {debugMessage === 'Обработка голоса...' ? (
-            <div className="flex gap-6 h-72 items-center justify-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-500 shadow-[0_0_30px_rgba(52,211,153,0.6)] animate-pulse" />
-              <div className="w-12 h-12 rounded-full bg-amber-500 shadow-[0_0_30px_rgba(251,191,36,0.6)] animate-pulse [animation-delay:0.2s]" />
-              <div className="w-12 h-12 rounded-full bg-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.6)] animate-pulse [animation-delay:0.4s]" />
-            </div>
-          ) : (
-            <div
-              onClick={stopRecordingFlow}
-              className={`w-72 h-72 rounded-full border-4 transition-all duration-700 cursor-pointer flex items-center justify-center relative ${screenColor === 'green'
-                ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_120px_rgba(52,211,153,0.4)]'
+        <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-12 duration-700">
+          <div
+            onClick={stopRecordingFlow}
+            className={`w-72 h-72 md:w-80 md:h-80 rounded-full border-4 transition-all duration-700 cursor-pointer flex items-center justify-center relative ${
+              screenColor === 'green'
+                ? 'bg-emerald-500/10 border-emerald-400 shadow-[0_0_120px_rgba(52,211,153,0.3)] animate-pulse-slow'
                 : screenColor === 'yellow'
-                  ? 'bg-amber-500/20 border-amber-300 shadow-[0_0_100px_rgba(251,191,36,0.4)]'
-                  : screenColor === 'blue'
-                    ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_120px_rgba(96,165,250,0.4)]'
-                    : 'bg-rose-500/20 border-rose-400 shadow-[0_0_100px_rgba(244,63,94,0.3)]'
-                }`}
-            >
-              {screenColor === 'blue' && (
-                <div className="absolute inset-0 rounded-full border-4 border-blue-400/30 animate-ping" />
-              )}
+                  ? 'bg-amber-500/10 border-amber-300 shadow-[0_0_100px_rgba(251,191,36,0.3)]'
+                  : screenColor === 'red'
+                    ? 'bg-rose-500/10 border-rose-400 shadow-[0_0_120px_rgba(244,63,94,0.3)]'
+                    : 'bg-blue-500/10 border-blue-400 shadow-[0_0_100px_rgba(96,165,250,0.2)]'
+            }`}
+          >
+            {/* Inner pulsing indicator for listening */}
+            {screenColor === 'green' && debugMessage === 'Слушаю вас...' && (
+              <div className="absolute inset-0 rounded-full border-4 border-emerald-400/20 animate-ping-slow" />
+            )}
 
-              {screenColor === 'red' && (
-                <span className="text-white/40 text-xs tracking-widest uppercase animate-pulse">Инициализация</span>
-              )}
-
-              {screenColor === 'blue' && (
-                <div className="flex flex-col items-center">
-                  <div className="flex gap-1 mb-3">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="w-1.5 h-8 bg-blue-400 rounded-full animate-wave" style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                  </div>
-                  <span className="text-blue-400 text-xs font-bold tracking-widest uppercase">Слушаю вас</span>
-                </div>
-              )}
-
+            {/* Icon/Content inside circle */}
+            <div className="flex flex-col items-center">
               {screenColor === 'green' && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
-                  <span className="text-emerald-400 text-xs font-bold tracking-widest uppercase">Говорю ответ</span>
+                <div className="flex gap-1.5 mb-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-1.5 h-10 bg-emerald-400 rounded-full animate-wave" style={{ animationDelay: `${i * 0.15}s` }} />
+                  ))}
                 </div>
               )}
-
-              {screenColor === 'yellow' && (
-                <span className="text-amber-300 text-xs font-bold tracking-widest uppercase">Ошибка сети</span>
-              )}
+              {screenColor === 'red' && <span className="text-rose-400 text-4xl mb-2">●</span>}
+              {screenColor === 'yellow' && <span className="text-amber-300 text-4xl mb-2">○</span>}
+              
+              <span className={`text-[10px] font-bold tracking-[0.3em] uppercase ${
+                screenColor === 'green' ? 'text-emerald-400' : 
+                screenColor === 'yellow' ? 'text-amber-300' : 
+                screenColor === 'red' ? 'text-rose-400' : 'text-blue-400'
+              }`}>
+                {debugMessage === 'Слушаю вас...' ? 'СЛУШАЮ' : 
+                 debugMessage.startsWith('Ответ:') ? 'УЧИТЕЛЬ' : 'ЖДУ...'}
+              </span>
             </div>
-          )}
+          </div>
 
-          <p className="mt-16 text-zinc-500 font-light tracking-widest text-sm uppercase text-center min-h-[1.5em]">
-            {debugMessage === 'Обработка голоса...'
-              ? 'Думаю...'
-              : screenColor === 'blue'
-                ? 'Говорите сейчас'
-                : screenColor === 'green'
-                  ? 'Слушайте учителя'
-                  : 'Нажмите на круг'}
-          </p>
+          <button 
+             onClick={stopRecordingFlow}
+             className="mt-20 text-zinc-500 font-light tracking-[0.2em] text-sm uppercase hover:text-[#e5c158] transition-colors"
+          >
+            {debugMessage === 'Обработка голоса...' ? 'ДУМАЮ...' : 'НАЖМИТЕ, ЧТОБЫ ОТВЕТИТЬ'}
+          </button>
         </div>
       )}
 
       <style jsx global>{`
         @keyframes wave {
-          0%, 100% { height: 20px; }
-          50% { height: 40px; }
+          0%, 100% { height: 16px; opacity: 0.5; }
+          50% { height: 40px; opacity: 1; }
         }
-        .animate-wave {
-          animation: wave 1s ease-in-out infinite;
+        @keyframes pulse-slow {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
         }
+        @keyframes ping-slow {
+          0% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+        .animate-wave { animation: wave 1.2s ease-in-out infinite; }
+        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+        .animate-ping-slow { animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
       `}</style>
-
     </div>
   );
 }
