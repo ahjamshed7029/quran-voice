@@ -1,8 +1,0 @@
-{
-<<<<<<< HEAD
-    "java.configuration.updateBuildConfiguration": "interactive"
-=======
-    "java.configuration.updateBuildConfiguration": "interactive",
-    "github-actions.workflows.validation.noActionResolution": "ignore"
->>>>>>> gh-pages
-}

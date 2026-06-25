@@ -10,9 +10,9 @@ export const speakText = (text: string, lang: string = "ar-SA") => {
   window.speechSynthesis.cancel();
 
   const utterance = new SpeechSynthesisUtterance(text);
-  
+
   // Устанавливаем язык (например, ar-SA для арабского текста Корана)
-  utterance.lang = lang; 
+  utterance.lang = lang;
   utterance.rate = 0.9;  // Чуть замедлим для четкости произношения
 
   // Находим подходящий голос в системе (необязательно, но улучшает качество)
@@ -35,6 +35,6 @@ export const playFeedbackSound = (type: 'green' | 'yellow' | 'red') => {
 
   const audio = new Audio(audioMap[type]);
   audio.volume = 0.2; // Делаем звук очень тихим (20% от максимальной громкости)
-  
+
   audio.play().catch(err => console.log("Ошибка воспроизведения звука:", err));
 };

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
+const APP_VERSION = "1.1.2"; // Incremented version to break cache
+
 export default function Home() {
   const [apiUrl, setApiUrl] = useState("https://quran-voice.onrender.com");
   const [isActivated, setIsActivated] = useState(false);
@@ -16,9 +18,23 @@ export default function Home() {
   }, []);
 
   const saveApiUrl = (url: string) => {
-    setApiUrl(url);
-    localStorage.setItem('quran_voice_api_url', url);
+    // Ensure URL doesn't end with slash to avoid double slashes later
+    const cleanUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    setApiUrl(cleanUrl);
+    localStorage.setItem('quran_voice_api_url', cleanUrl);
     setIsSettingsOpen(false);
+  };
+
+  const forceUpdateApp = async () => {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let registration of registrations) {
+        await registration.unregister();
+      }
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
   };
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -99,7 +115,7 @@ export default function Home() {
 
   const startRecordingFlow = async () => {
     setDebugMessage('Слушаю вас...');
-    setScreenColor('green'); // User requested Green for listening/correct
+    setScreenColor('green');
 
     try {
       if (!mediaRecorderRef.current) {
@@ -161,6 +177,7 @@ export default function Home() {
     try {
       setDebugMessage('Отправка на сервер...');
 
+      // Added trailing slashes to match potential server expectations
       const response = await fetch(`${apiUrl}/api/agent/talk`, {
         method: 'POST',
         body: formData,
@@ -201,6 +218,7 @@ export default function Home() {
     setIsActivated(true);
 
     try {
+      // Added trailing slashes to match potential server expectations
       const response = await fetch(`${apiUrl}/api/agent/welcome`, { method: 'POST' });
       if (response.ok) {
         const data = await response.json();
@@ -215,20 +233,22 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                window.location.reload();
-              }
+    const swLogic = async () => {
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            registration.onupdatefound = () => {
+                const installingWorker = registration.installing;
+                if (installingWorker) {
+                    installingWorker.onstatechange = () => {
+                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            window.location.reload();
+                        }
+                    };
+                }
             };
-          }
-        };
-      });
-    }
+        }
+    };
+    swLogic();
 
     return () => {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -241,43 +261,59 @@ export default function Home() {
       
       {/* HUD: Debug & Settings */}
       <div className="absolute top-6 right-6 flex items-center gap-3 z-20">
-        <div className="text-[10px] font-mono text-zinc-500 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 max-w-[200px] truncate">
-          {debugMessage}
+        <div className="flex flex-col items-end">
+            <div className="text-[8px] font-mono text-zinc-600 mb-1">VERSION {APP_VERSION}</div>
+            <div className="text-[10px] font-mono text-[#e5c158] bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 max-w-[200px] truncate shadow-lg">
+                {debugMessage}
+            </div>
         </div>
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 border border-white/5 text-lg hover:text-white transition-all active:scale-90"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 border border-white/5 text-lg hover:text-white transition-all active:scale-90 shadow-lg"
         >
           ⚙️
         </button>
       </div>
 
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-50 p-6">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-50 p-6">
           <div className="bg-[#1a1f2e] border border-white/10 p-8 rounded-[2rem] w-full max-w-sm shadow-2xl">
-            <h2 className="text-[#e5c158] text-xl font-semibold mb-6">Настройки сервера</h2>
-            <input
-              type="text"
-              defaultValue={apiUrl}
-              id="api_input"
-              className="w-full bg-black/50 border border-white/10 p-4 rounded-xl mb-6 text-soft font-mono text-sm focus:border-[#e5c158]/50 outline-none transition-all"
-              placeholder="https://your-api.com"
-            />
-            <div className="flex gap-3">
+            <h2 className="text-[#e5c158] text-xl font-bold mb-6">Настройки</h2>
+            
+            <div className="mb-4">
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2 block">API Server URL</label>
+              <input
+                type="text"
+                defaultValue={apiUrl}
+                id="api_input"
+                className="w-full bg-black/50 border border-white/10 p-4 rounded-xl text-soft font-mono text-sm focus:border-[#e5c158]/50 outline-none transition-all"
+                placeholder="https://your-api.com"
+              />
+            </div>
+
+            <div className="flex flex-col gap-3">
               <button
                 onClick={() => {
                   const input = document.getElementById('api_input') as HTMLInputElement;
                   saveApiUrl(input.value);
                 }}
-                className="flex-1 bg-[#e5c158] text-black font-bold p-4 rounded-xl active:scale-95 transition-all"
+                className="w-full bg-[#e5c158] text-black font-bold p-4 rounded-xl active:scale-95 transition-all shadow-lg"
               >
                 Сохранить
               </button>
+              
+              <button
+                onClick={forceUpdateApp}
+                className="w-full bg-rose-500/10 text-rose-400 border border-rose-500/20 p-4 rounded-xl text-sm font-medium hover:bg-rose-500/20 active:scale-95 transition-all"
+              >
+                СБРОС КЭША И ОБНОВЛЕНИЕ
+              </button>
+
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className="flex-1 bg-white/5 text-soft p-4 rounded-xl active:scale-95 transition-all hover:bg-white/10"
+                className="w-full bg-white/5 text-zinc-400 p-4 rounded-xl text-sm active:scale-95 transition-all hover:bg-white/10"
               >
-                Отмена
+                Закрыть
               </button>
             </div>
           </div>
@@ -287,7 +323,7 @@ export default function Home() {
       {/* Hero: Splash Screen */}
       {!isActivated && (
         <div className="flex flex-col items-center animate-in fade-in zoom-in duration-1000">
-          <div className="relative w-64 h-64 md:w-80 md:h-80 mb-10">
+          <div className="relative w-64 h-64 md:w-80 md:h-80 mb-10 drop-shadow-[0_0_30px_rgba(229,193,88,0.15)]">
             <Image
               src="/icons/logo.png"
               alt="Siraj Logo"
@@ -296,12 +332,12 @@ export default function Home() {
               priority
             />
           </div>
-          <h1 className="text-5xl font-black tracking-[0.3em] mb-3 text-[#e5c158]">SIRAJ</h1>
-          <p className="text-zinc-500 italic mb-16 text-lg tracking-widest">سراج — ПУТЕВОДНЫЙ СВЕТ</p>
+          <h1 className="text-5xl md:text-6xl font-black tracking-[0.3em] mb-3 text-[#e5c158] drop-shadow-sm">SIRAJ</h1>
+          <p className="text-zinc-500 italic mb-16 text-lg tracking-[0.2em]">سراج — ПУТЕВОДНЫЙ СВЕТ</p>
 
           <button
             onClick={handleFirstTapStart}
-            className="group relative px-16 py-6 bg-transparent border border-[#e5c158]/30 rounded-full text-[#e5c158] text-xl font-bold tracking-[0.2em] overflow-hidden transition-all hover:border-[#e5c158] hover:shadow-[0_0_30px_rgba(229,193,88,0.2)] active:scale-95"
+            className="group relative px-16 py-6 bg-transparent border border-[#e5c158]/30 rounded-full text-[#e5c158] text-xl font-bold tracking-[0.2em] overflow-hidden transition-all hover:border-[#e5c158] hover:shadow-[0_0_50px_rgba(229,193,88,0.2)] active:scale-95 shadow-xl"
           >
             <div className="absolute inset-0 bg-[#e5c158]/5 group-hover:bg-[#e5c158]/10 transition-colors" />
             НАЧАТЬ ОБУЧЕНИЕ

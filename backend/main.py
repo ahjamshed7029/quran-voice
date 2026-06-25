@@ -133,9 +133,13 @@ async def welcome_endpoint():
         "mentor_name": "Хасан"
     }
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "version": "1.1.0"}
+
 @app.get("/")
 def root():
-    return {"status": "working", "ip": "192.168.76.70"}
+    return {"status": "working", "ip": "192.168.76.70", "service": "quran-voice-backend"}
 
 if __name__ == "__main__":
     import os
